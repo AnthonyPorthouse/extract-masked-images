@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+prefix='img'
+
+function main {
+  local file="$@"
+
+  echo "Extracting: $file"
+
+  pdfimages -png "$file" $prefix
+
+  apply_masks $file
+}
+
+function apply_masks {
+  local file="$@"
+
+  local data="$(pdfimages -list "$file" | tail -n +3 | awk '{print $2 " " $3}')"
+
+  while read -r line; do
+    local id="$(echo $line | cut -d' ' -f1)"
+    local type="$(echo $line | cut -d' ' -f2)"
+
+    local prevId=$(( $id - 1 ))
+
+    printf -v prevId "%03d" $prevId
+    printf -v id "%03d" $id
+
+    local maskFile="$prefix-$id.png"
+    local imageFile="$prefix-$prevId.png"
+
+    if [ "$type" = "smask" ]; then
+      echo "Applying Mask to $prevId"
+      composite -compose CopyOpacity "$maskFile" "$imageFile" "$imageFile"
+      rm "$maskFile"
+    fi
+  done <<< "$data"
+}
+
+main "$@"
